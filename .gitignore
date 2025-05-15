@@ -1,1 +1,5 @@
 .venv
+processed_outputs
+uploaded_pdfs
+temp_processing_workspace
+__pycache__

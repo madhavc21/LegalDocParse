@@ -16,8 +16,7 @@ dateparser
 # NLP - SpaCy and models
 spacy
 spacy-transformers
-# Note: en_core_web_lg and en_legal_ner_trf are downloaded/installed separately,
-# not listed directly as pip package names here, but their base library (spacy) is.
+
 
 torch
 torchvision

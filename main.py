@@ -64,79 +64,64 @@ async def health_check():
 
 
 @app.post("/ingest", summary="Ingest and Process PDF", status_code=status.HTTP_200_OK)
+@app.post("/ingest", summary="Ingest and Process PDF", status_code=status.HTTP_200_OK)
 async def ingest_pdf(file: UploadFile = File(...)):
-    """
-    Accepts a PDF file, processes it to extract structured content and metadata,
-    saves the result to a JSON file, and returns the path to the output file.
-    """
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided.")
     
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Only PDF files are accepted.")
 
-    # Generate a unique filename for the uploaded PDF to avoid conflicts
     unique_id = uuid.uuid4().hex
-    pdf_filename = f"{unique_id}_{file.filename}"
-    uploaded_pdf_path = UPLOAD_DIR / pdf_filename
+    pdf_filename_stem = Path(file.filename).stem
+    uploaded_pdf_path = UPLOAD_DIR / f"{pdf_filename_stem}_{unique_id}.pdf"
+    
+    request_temp_dir = TEMP_PROCESSING_DIR / unique_id
+    output_json_for_file_save_path = OUTPUT_DIR / f"{pdf_filename_stem}_{unique_id}_processed_output.json"
 
     try:
-        # Save the uploaded PDF
         with open(uploaded_pdf_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         logger.info(f"Uploaded PDF saved to: {uploaded_pdf_path}")
 
-        # --- Milestone 1: Extract Structured Content ---
-        logger.info(f"Starting content extraction for {pdf_filename}...")
-        # document_parser needs a working directory for its HTML assets
-        # Create a unique sub-directory within TEMP_PROCESSING_DIR for this request
-        request_temp_dir = TEMP_PROCESSING_DIR / unique_id
+        logger.info(f"Starting content extraction for {file.filename}...")
         request_temp_dir.mkdir(parents=True, exist_ok=True)
-
-        structured_content = document_parser.extract_structured_content_from_pdf(
+        structured_content_list = document_parser.extract_structured_content_from_pdf(
             pdf_filepath=uploaded_pdf_path,
             working_dir=request_temp_dir 
         )
 
-        if structured_content is None:
-            logger.error(f"Content extraction failed for {pdf_filename}.")
+        if structured_content_list is None: # Or potentially check if it's an empty list and handle
+            logger.error(f"Content extraction failed or yielded no data for {file.filename}.")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to extract content from PDF.")
-        logger.info(f"Content extraction successful for {pdf_filename}.")
+        logger.info(f"Content extraction successful for {file.filename}.")
 
-        # --- Milestone 2: Extract Legal Metadata ---
-        logger.info(f"Starting metadata extraction for {pdf_filename}...")
-        # Document name for metadata can be the original filename or the processed one
-        doc_name_for_metadata = Path(file.filename).stem # Use original filename stem
-
-        extracted_metadata = metadata_extractor.extract_document_metadata(
-            structured_content=structured_content,
-            doc_name=doc_name_for_metadata
+        logger.info(f"Starting metadata extraction for {file.filename}...")
+        extracted_metadata_object = metadata_extractor.extract_document_metadata(
+            structured_content=structured_content_list, # Corrected variable name
+            doc_name=pdf_filename_stem
         )
-        logger.info(f"Metadata extraction successful for {pdf_filename}.")
+        logger.info(f"Metadata extraction successful for {file.filename}.")
 
-        # --- Combine outputs and save ---
-        final_output_data = {
-            "source_pdf_filename": file.filename, # Original filename
-            "processed_pdf_id": unique_id,      # Unique ID for this processing run
-            "content": structured_content,
-            "metadata": extracted_metadata      # This is already the "metadata" object from M2
+        # This is the data that will be returned directly in the API response
+        api_response_data = {
+            "content": structured_content_list, # Corrected variable name
+            "metadata": extracted_metadata_object
         }
 
-        output_json_filename = f"{doc_name_for_metadata}_{unique_id}_processed.json"
-        output_json_path = OUTPUT_DIR / output_json_filename
+        # For saving to a file, we can include more audit info if desired
+        file_save_data = {
+            "source_pdf_filename": file.filename,
+            "processing_id": unique_id,
+            **api_response_data # Embed the content and metadata
+        }
         
-        with open(output_json_path, "w", encoding="utf-8") as f:
-            json.dump(final_output_data, f, indent=2)
-        logger.info(f"Combined output saved to: {output_json_path}")
+        with open(output_json_for_file_save_path, "w", encoding="utf-8") as f:
+            json.dump(file_save_data, f, indent=2)
+        logger.info(f"Full processed output saved to file: {output_json_for_file_save_path}")
 
-        return JSONResponse(
-            content={
-                "message": "PDF processed successfully.",
-                "original_filename": file.filename,
-                "output_file_path": str(output_json_path.relative_to(BASE_DIR)) # Return relative path
-            },
-            status_code=status.HTTP_200_OK
-        )
+        # --- THIS IS THE FIX: Return the actual data ---
+        return api_response_data 
 
     except HTTPException as http_exc:
         # Re-raise HTTPException to let FastAPI handle it

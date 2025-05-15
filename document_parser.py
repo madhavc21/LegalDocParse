@@ -2,13 +2,13 @@
 import logging
 from pathlib import Path
 import json
-from bs4 import BeautifulSoup # type: ignore
+from bs4 import BeautifulSoup 
 
 # Docling imports
-from docling_core.types.doc import ImageRefMode # type: ignore
-from docling.datamodel.base_models import InputFormat # type: ignore
-from docling.datamodel.pipeline_options import PdfPipelineOptions # type: ignore
-from docling.document_converter import DocumentConverter, PdfFormatOption # type: ignore
+from docling_core.types.doc import ImageRefMode 
+from docling.datamodel.base_models import InputFormat 
+from docling.datamodel.pipeline_options import PdfPipelineOptions 
+from docling.document_converter import DocumentConverter, PdfFormatOption 
 
 logger = logging.getLogger(__name__)
 
@@ -85,18 +85,13 @@ def parse_document_html_to_structured_content(html_filepath: Path) -> list:
         logger.error("HTML <body> tag not found in {html_filepath}. Cannot parse content.")
         return []
 
-    # Docling usually places content elements directly under <body> or within a <div class='page'>
-    # It uses <hr class="page-break"> for page breaks.
-    # We iterate through all direct children of body and also look for page breaks.
-    # More robustly, find all relevant tags and page break tags in document order.
     relevant_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'table', 'figure', 'hr']
     
     all_found_elements = soup.body.find_all(relevant_tags, recursive=True) # Find all, not just direct children
 
     for element in all_found_elements:
-        # Skip elements nested inside tables or figures if we're processing the parent
         if any(parent.name in ['table', 'figure'] for parent in element.find_parents(limit=3) if parent != element):
-            if element.name not in ['li', 'img', 'figcaption']: # Allow list items and figure components
+            if element.name not in ['li', 'img', 'figcaption']: 
                 continue
         
         item_data = None
@@ -119,17 +114,16 @@ def parse_document_html_to_structured_content(html_filepath: Path) -> list:
                 item_data = {"text": text_content}
 
         elif element.name in ['ul', 'ol']:
-            # Process list items individually as 'list_item' or 'paragraph'
             for li in element.find_all('li', recursive=False):
                 li_text = li.get_text(separator=' ', strip=True)
                 if li_text:
                     structured_elements.append({
-                        "type": "list_item", # Using "list_item" for clarity
+                        "type": "list_item", 
                         "text": li_text,
                         "page_number": current_page_number,
                         "metadata": {}
                     })
-            continue # Handled list items, skip processing ul/ol tag itself
+            continue 
 
         elif element.name == 'table':
              # Avoid processing tables nested within other tables directly if the outer one is already being processed
@@ -162,9 +156,7 @@ def parse_document_html_to_structured_content(html_filepath: Path) -> list:
                 }
         
         if item_type and item_data is not None:
-            # Check if this exact text block from this page was already added
-            # (e.g. if a <p> is inside a <div> that was also processed)
-            # This is a simple check, could be more robust
+
             is_duplicate = False
             if structured_elements:
                 last_el = structured_elements[-1]
@@ -208,33 +200,3 @@ def extract_structured_content_from_pdf(pdf_filepath: Path, working_dir: Path) -
     else:
         logger.error(f"Failed to generate or find HTML for {pdf_filepath.name}. Cannot extract content.")
         return None
-
-if __name__ == '__main__':
-    # Example Usage (for testing this module directly)
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
-    
-    # Create a dummy PDF path and working directory for the example
-    # In a real scenario, these paths would point to actual files/directories
-    # For this example to run, you'd need a PDF and docling installed.
-    # This __main__ block is illustrative; actual use will be from the API endpoint.
-
-    # Replace with an actual PDF path for testing
-    # example_pdf_path = Path("path_to_your_sample.pdf") 
-    example_pdf_path = Path("RFD.pdf") # Assuming RFD.pdf is in the same directory
-    
-    if not example_pdf_path.exists():
-        logger.error(f"Example PDF not found at {example_pdf_path}. Skipping example run.")
-    else:
-        temp_working_dir = Path("./temp_processing_output")
-        temp_working_dir.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"Running example content extraction for: {example_pdf_path.name}")
-        content_data = extract_structured_content_from_pdf(example_pdf_path, temp_working_dir)
-        
-        if content_data:
-            output_json_path = temp_working_dir / f"{example_pdf_path.stem}_extracted_content.json"
-            with open(output_json_path, "w", encoding="utf-8") as f:
-                json.dump({"document_content": content_data}, f, indent=2) # Changed key for clarity
-            logger.info(f"Example extracted content saved to: {output_json_path}")
-        else:
-            logger.warning("Example content extraction failed.")

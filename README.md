@@ -1,4 +1,4 @@
-# PDF Document Ingestion Pipeline - Infiny Technical Assignment V2
+# PDF Document Ingestion Pipeline
 
 This project implements a Python-based ingestion pipeline to parse PDF documents, extract structured content, and derive legal metadata. It exposes an HTTP API endpoint for processing PDF uploads.
 
@@ -50,8 +50,8 @@ This project implements a Python-based ingestion pipeline to parse PDF documents
 ### 1. Clone the Repository (if applicable)
 
 ```bash
-git clone <repository_url>
-cd <repository_name>
+git clone https://github.com/madhavc21/LegalDocParse
+cd LegalDocParse
 ```
 
 ### 2. Create a Virtual Environment (Recommended)
@@ -72,7 +72,6 @@ pip install -r requirements.txt
 The base `spacy` library is installed via `requirements.txt`. You then need to download the specific models:
 
 ```bash
-python -m spacy download en_core_web_lg
 pip install  https://huggingface.co/ali6parmak/en_legal_ner_trf/resolve/main/en_legal_ner_trf-3.2.0-py3-none-any.whl
 ```
 
@@ -129,8 +128,7 @@ The provided `Dockerfile` installs CPU versions of PyTorch for wider compatibili
 - **Metadata Extraction:**
     - A hybrid approach is used:
         - **SpaCy for NER:**
-            - `en_core_web_lg` for general named entities like Persons.
-            - `en_legal_ner_trf` (a transformer model) for specialized legal entities such as Statutes (Acts), Provisions (Clauses, Articles, Sections), Precedents (Case Law), and Dates. This model provides higher accuracy for legal domain text.
+            - `en_legal_ner_trf` (a transformer model) for specialized legal entities such as Statutes (Acts), Provisions (Clauses, Articles, Sections), Precedents (Case Law), Personnels and Dates. This model provides higher accuracy for legal domain text.
         - **`python-dateparser`:** Used to parse date strings identified by the NER model into standardized datetime objects.
         - **Regex:** Employed for specific patterns not well-covered by NER, such as references to letters/correspondence.
     - The strategy for dates prioritizes the `DATE` entities found by `en_legal_ner_trf` due to its higher precision on legal documents compared to broader date parsing tools applied to raw text.
@@ -155,5 +153,6 @@ The provided `Dockerfile` installs CPU versions of PyTorch for wider compatibili
 - **Complex Table Structures:** While tables are extracted as HTML, very complex nested tables or tables with unusual formatting might not be perfectly represented.
 - **Figure Caption Linkage:** Figure captions are extracted if present near a `figure` tag in HTML, but complex layouts might make precise caption-to-image linkage challenging.
 - **OCR Quality:** If PDFs are image-based, the quality of extraction depends heavily on the OCR performance of the underlying `docling` library or the PDF itself. No separate OCR step is explicitly added in this pipeline.
-- **Scalability for Concurrent Ingestion:** The current API processes one PDF at a time. For high concurrency, a task queue (like Celery with Redis/RabbitMQ) and horizontally scalable workers would be needed (Bonus/Optional).
+- **Scalability for Concurrent Ingestion:** The current API processes one PDF at a time. For high concurrency, a task queue (like Celery with Redis/RabbitMQ) and horizontally scalable workers would be needed.
 - **Resource Intensive Models:** The transformer-based legal NER model (`en_legal_ner_trf`) is resource-intensive. Performance will be significantly better with a GPU.
+- **Speed with large document ingestion:** Conversion of very large docs (`RFD.pdf`) is proportionally slower, thus a GPU enviornment is HIGHLY recommended. CPU times can become very large.
