@@ -2,4 +2,4 @@
 processed_outputs
 uploaded_pdfs
 temp_processing_workspace
-__pycache__
+__pycache__/
