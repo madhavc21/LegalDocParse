@@ -19,16 +19,9 @@ spacy-transformers
 # Note: en_core_web_lg and en_legal_ner_trf are downloaded/installed separately,
 # not listed directly as pip package names here, but their base library (spacy) is.
 
-# PyTorch (CPU version by default for wider compatibility, GPU can be specified in Docker)
-# Forcing CPU version here for requirements.txt to make it more general.
-# Docker can install a GPU-specific version if a GPU is available.
-torch==2.2.1+cpu
-torchvision==0.17.1+cpu
-torchaudio==2.2.1+cpu
-# If you are SURE you will only run this on a GPU machine/Docker with GPU:
-# torch --index-url https://download.pytorch.org/whl/cu118 # or cu121 etc.
-# torchvision --index-url https://download.pytorch.org/whl/cu118
-# torchaudio --index-url https://download.pytorch.org/whl/cu118
+torch
+torchvision
+torchaudio
 
 # Other utilities
 python-multipart # For FastAPI file uploads
